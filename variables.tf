@@ -47,7 +47,7 @@ EOF
 }
 
 variable "cluster_name" {
-  default     = "k3s"
+  default     = "rke2"
   type        = string
   description = "Name of the cluster used for prefixing cluster components (ie nodes)."
 }
@@ -72,25 +72,9 @@ variable "onboot" {
   default = true
 }
 
-variable "support_node_settings" {
-  type = object({
-    cores          = optional(number, 2),
-    sockets        = optional(number, 1),
-    memory         = optional(number, 4096),
-    storage_type   = optional(string, "scsi"),
-    storage_id     = optional(string, "local-lvm"),
-    disk_size      = optional(string, "20G"),
-    user           = optional(string, "k3s"),
-    db_name        = optional(string, "k3s"),
-    db_user        = optional(string, "k3s"),
-    network_bridge = optional(string, "vmbr0"),
-    network_tag    = optional(number, -1),
-  })
-}
-
 variable "master_nodes_count" {
   description = "Number of master nodes."
-  default     = 2
+  default     = 3
   type        = number
 }
 
@@ -99,6 +83,7 @@ variable "master_node_settings" {
     cores          = optional(number, 2),
     sockets        = optional(number, 1),
     memory         = optional(number, 4096),
+    scsihw         = optional(string, "virtio-scsi-pci")
     storage_type   = optional(string, "scsi"),
     storage_id     = optional(string, "local-lvm"),
     disk_size      = optional(string, "20G"),
@@ -121,12 +106,13 @@ variable "node_pools" {
     cores        = optional(number, 2),
     sockets      = optional(number, 1),
     memory       = optional(number, 4096),
+    scsihw       = optional(string, "virtio-scsi-pci")
     storage_type = optional(string, "scsi"),
     storage_id   = optional(string, "local-lvm"),
-    disk_size    = optional(string, "20G"),
+    disk_size    = optional(string, "25G"),
     user         = optional(string, "k3s"),
     network_tag  = optional(number, -1),
-
+    start_id     = optional(number, 210),
     template = optional(string),
 
     network_bridge = optional(string, "vmbr0"),
@@ -139,20 +125,14 @@ variable "api_hostnames" {
   default     = []
 }
 
-variable "k3s_disable_components" {
-  description = "List of components to disable. Ref: https://rancher.com/docs/k3s/latest/en/installation/install-options/server-config/#kubernetes-components"
-  type        = list(string)
-  default     = []
-}
-
-variable "http_proxy" {
-  default     = ""
-  type        = string
-  description = "http_proxy"
-}
-
 variable "nameserver" {
   default     = ""
   type        = string
   description = "nameserver"
+}
+
+variable "vm_start_id" {
+  type = string
+  default = "204"
+  
 }

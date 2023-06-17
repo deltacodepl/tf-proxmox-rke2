@@ -5,18 +5,10 @@ resource "macaddress" "k3s-masters" {
 locals {
   master_node_settings = var.master_node_settings
   master_node_ips = [for i in range(var.master_nodes_count) : cidrhost(var.control_plane_subnet, i + 1)]
-}
-
-resource "random_password" "k3s-server-token" {
-  length           = 32
-  special          = false
-  override_special = "_%@"
+  lan_subnet_cidr_bitnum = split("/", var.lan_subnet)[1]
 }
 
 resource "proxmox_vm_qemu" "k3s-master" {
-  depends_on = [
-    proxmox_vm_qemu.k3s-support,
-  ]
 
   count       = var.master_nodes_count
   target_node = var.proxmox_node
@@ -25,6 +17,7 @@ resource "proxmox_vm_qemu" "k3s-master" {
   clone = var.node_template
 
   pool = var.proxmox_resource_pool
+  vmid = var.vm_start_id + count.index + 1
 
   # cores = 2
   cores   = local.master_node_settings.cores
@@ -32,7 +25,9 @@ resource "proxmox_vm_qemu" "k3s-master" {
   memory  = local.master_node_settings.memory
 
   agent = 1
+  # define_connection_info = false
   onboot = var.onboot
+  scsihw = "virtio-scsi-pci"
 
   disk {
     type    = local.master_node_settings.storage_type
@@ -77,40 +72,40 @@ resource "proxmox_vm_qemu" "k3s-master" {
     private_key = file(var.private_key)
   }
 
+  provisioner "file" {
+    # source = "${path.module}/scripts/install-updates.sh.tftpl"
+    destination = "/tmp/install.sh"
+    content = templatefile("${path.module}/scripts/install-updates.sh.tftpl", {
+      k3s_is_master = true
+    })
+  }
+
   provisioner "remote-exec" {
     inline = [
-      templatefile("${path.module}/scripts/install-k3s-server.sh.tftpl", {
-        mode         = "server"
-        tokens       = [random_password.k3s-server-token.result]
-        alt_names    = concat([local.support_node_ip], var.api_hostnames)
-        server_hosts = []
-        node_taints  = ["CriticalAddonsOnly=true:NoExecute"]
-        disable      = var.k3s_disable_components
-        datastores   = [
-          {
-            host     = "${local.support_node_ip}:3306"
-            name     = "k3s"
-            user     = "k3s"
-            password = random_password.k3s-master-db-password.result
-          }
-        ]
-        http_proxy = var.http_proxy
-      })
+      "chmod u+x /tmp/install.sh",
+      "/tmp/install.sh",
+      "rm -r /tmp/install.sh",
     ]
   }
-}
-
-data "external" "kubeconfig" {
-  depends_on = [
-    proxmox_vm_qemu.k3s-support,
-    proxmox_vm_qemu.k3s-master
-  ]
-
-  program = [
-    "/usr/bin/ssh",
-    "-o UserKnownHostsFile=/dev/null",
-    "-o StrictHostKeyChecking=no",
-    "${local.master_node_settings.user}@${local.master_node_ips[0]}",
-    "echo '{\"kubeconfig\":\"'$(sudo cat /etc/rancher/k3s/k3s.yaml | base64)'\"}'"
-  ]
+  # provisioner "remote-exec" {
+  #   inline = [
+  #     templatefile("${path.module}/scripts/install-updates.sh.tftpl", {
+  #       mode         = "server"
+  #       tokens       = [random_password.k3s-server-token.result]
+  #       alt_names    = concat([local.support_node_ip], var.api_hostnames)
+  #       server_hosts = []
+  #       node_taints  = ["CriticalAddonsOnly=true:NoExecute"]
+  #       disable      = var.k3s_disable_components
+  #       datastores   = [
+  #         {
+  #           host     = "${local.support_node_ip}:3306"
+  #           name     = "k3s"
+  #           user     = "k3s"
+  #           password = random_password.k3s-master-db-password.result
+  #         }
+  #       ]
+  #       http_proxy = var.http_proxy
+  #     })
+  #   ]
+  # }
 }

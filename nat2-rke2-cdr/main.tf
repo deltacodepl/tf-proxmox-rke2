@@ -1,52 +1,21 @@
-terraform {
-  required_providers {
-    proxmox = {
-      source = "Telmate/proxmox"
-      version = "2.9.3"
-    }
-
-    macaddress = {
-      source = "ivoronin/macaddress"
-      version = "0.3.0"
-    }
-  }
-}
-
-provider proxmox {
-  pm_log_enable = true
-  pm_log_file = "terraform-plugin-proxmox.log"
-  pm_debug = true
-  pm_log_levels = {
-    _default = "debug"
-    _capturelog = ""
-  }
-
-  ## TODO: Update these for your specific setup
-  pm_api_url = "https://192.168.1.214:8006/api2/json"
-}
 
 module "k3s" {
-  source  = ".."
-  version = ">= 0.0.0, < 1" # Get latest 0.X release
+  source = "../"
+  # version = ">= 0.0.0, < 1" # Get latest 0.X release
 
-  authorized_keys_file = "authorized_keys"
+  authorized_keys_file = "~/.ssh/id_rsa.pub"
 
-  proxmox_node = "my-proxmox-node"
+  proxmox_node = "nat2"
 
-  node_template = "ubuntu-template"
-  proxmox_resource_pool = "my-k3s"
+  node_template         = "ubuntu-2204"
+  proxmox_resource_pool = "rke2"
 
-  network_gateway = "192.168.0.1"
-  lan_subnet = "192.168.0.0/24"
+  network_gateway = "192.168.1.1"
+  lan_subnet      = "192.168.1.0/24"
 
-  support_node_settings = {
-    cores = 2
-    memory = 4096
-  }
-
-  master_nodes_count = 2
+  master_nodes_count = 3
   master_node_settings = {
-    cores = 2
+    cores  = 2
     memory = 4096
   }
 
@@ -55,16 +24,13 @@ module "k3s" {
 
   node_pools = [
     {
-      name = "default"
-      size = 2
-      # 192.168.0.208 -> 192.168.0.223 (14 available IPs for nodes)
-      subnet = "192.168.1.160/28"
+      name     = "rke2"
+      size     = 5
+      start_id = 210
+      #/28 192.168.0.208 -> 192.168.0.223 (14 available IPs for nodes)
+      subnet = "192.168.1.160/29"
     }
   ]
 }
 
-output "kubeconfig" {
-  value = module.k3s.k3s_kubeconfig
-  sensitive = true
-}
 
